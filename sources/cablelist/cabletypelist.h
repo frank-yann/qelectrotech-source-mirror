@@ -99,6 +99,8 @@ class CableTypeList
 		static QString designation(const CableTypeRecord &record);
 		static int coreCount(const CableTypeRecord &record);
 		static QStringList coreColors(const CableTypeRecord &record);
+		static QString appendCoreColor(const QString &cell,
+									   const QString &color);
 
 		//File io
 		static bool load(const QString &path, CableTypeListData *data, QString *error = nullptr);
