@@ -32,6 +32,16 @@ def _escape(path):
     return path.replace('$', '$$').replace(':', '$:').replace(' ', '$ ')
 
 
+def _ninja_path(build, path):
+    """A file as build.ninja names it: relative to the build folder when it
+    is inside it, such as the macOS bundle's
+    qelectrotech.app/Contents/MacOS/qelectrotech, and absolute otherwise."""
+    try:
+        return path.relative_to(build).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def build_probe(build, binary, source, manifest_name):
     """Build the probe `source` (a .cpp) in place of main.cpp; return its path.
 
@@ -64,12 +74,10 @@ def _build_probe(build, binary, source, manifest_name):
         manifest = re.sub(r'(?<![\w.])' + re.escape(binary.stem) + r'\.(exe|pdb)(?![\w.])',
                           name + r'.\1', manifest)
     else:
-        old_target = _escape(binary.name if binary.parent == build else binary.as_posix())
-        new_target = _escape(probe_binary.name if probe_binary.parent == build
-                             else probe_binary.as_posix())
-        manifest = manifest.replace('build ' + old_target + ':', 'build ' + new_target + ':')
-        old_file = binary.name if binary.parent == build else binary.as_posix()
-        new_file = probe_binary.name if probe_binary.parent == build else probe_binary.as_posix()
+        old_file = _ninja_path(build, binary)
+        new_file = _ninja_path(build, probe_binary)
+        manifest = manifest.replace('build ' + _escape(old_file) + ':',
+                                    'build ' + _escape(new_file) + ':')
         manifest = re.sub(r'^  TARGET_FILE = ' + re.escape(old_file) + r'$',
                           '  TARGET_FILE = ' + new_file, manifest, flags=re.MULTILINE)
     probe_manifest = build / manifest_name
@@ -77,7 +85,7 @@ def _build_probe(build, binary, source, manifest_name):
     ninja = shutil.which('ninja')
     if not ninja:
         sys.exit('Ninja is required for the integration probe.')
-    target = probe_binary.name if probe_binary.parent == build else str(probe_binary)
+    target = _ninja_path(build, probe_binary)
     subprocess.run([ninja, '-C', str(build), '-f', probe_manifest.name, target], check=True)
     return probe_binary
 
